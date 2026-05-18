@@ -52,7 +52,7 @@ async def save_transformation_record(
         logger.error(f"Failed to save transform history to DB: {e}")
 
 
-@router.post("/", response_model=DataSourceOut, status_code=status.HTTP_201_CREATED, summary="Onboard new legacy source")
+@router.post("", response_model=DataSourceOut, status_code=status.HTTP_201_CREATED, summary="Onboard new legacy source")
 async def create_data_source(
     source: DataSourceCreate,
     db: AsyncSession = Depends(get_db),
@@ -73,7 +73,7 @@ async def create_data_source(
     return new_source
 
 
-@router.get("/", response_model=List[DataSourceOut], summary="List all legacy sources")
+@router.get("", response_model=List[DataSourceOut], summary="List all legacy sources")
 async def list_adapters(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_user),

@@ -48,13 +48,34 @@ export default function Adapters() {
 
   const fetchSources = async () => {
     try {
-      const token = await getAuthToken()
-      const res = await axios.get('http://localhost:8000/adapters', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setAdapters(res.data)
+      let token = await getAuthToken()
+      let res;
+      try {
+        res = await axios.get('http://localhost:8000/adapters', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      } catch (err: any) {
+        // Handle token expiration/corruption by clearing local token and obtaining a fresh one
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          localStorage.removeItem('token')
+          token = await getAuthToken()
+          res = await axios.get('http://localhost:8000/adapters', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        } else {
+          throw err
+        }
+      }
+      
+      if (res && Array.isArray(res.data)) {
+        setAdapters(res.data)
+      } else {
+        console.warn("Expected array of adapters, got:", res?.data)
+        setAdapters([])
+      }
     } catch (e) {
       console.error("Failed to fetch adapters", e)
+      setAdapters([])
     } finally {
       setLoading(false)
     }

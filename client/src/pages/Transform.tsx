@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { ArrowRight, Play, Wand2, RefreshCw, FileWarning, UploadCloud, Server } from 'lucide-react'
+import { ArrowRight, Play, Wand2, RefreshCw, AlertCircle, UploadCloud, Server } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import axios from 'axios'
 import { useAppStore } from '@/store/appStore'
@@ -163,7 +163,7 @@ export default function Transform() {
           <CardHeader className="border-b border-card-border/50 pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-error">
-                <FileWarning className="h-5 w-5" />
+                <AlertCircle className="h-5 w-5" />
                 Legacy Source (Chaos)
               </CardTitle>
               <Badge variant="destructive">RAW</Badge>
