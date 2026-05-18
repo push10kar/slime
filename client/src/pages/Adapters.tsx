@@ -1,50 +1,24 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import axios from 'axios'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Database, FileText, Code2, Network, Plus, CheckCircle2, Play, AlertCircle, Upload, FileUp } from 'lucide-react'
 
-const INITIAL_ADAPTERS = [
-  {
-    id: 'csv',
-    name: 'Flat File (CSV)',
-    description: 'Ingests messy comma-separated values from legacy FTP drops.',
-    status: 'active',
-    icon: FileText,
-    latency: '12ms',
-    features: ['Auto-header detection', 'Type coercion', 'Quote parsing']
-  },
-  {
-    id: 'xml',
-    name: 'Hierarchical (XML)',
-    description: 'Parses deeply nested legacy XML structures into flat JSON.',
-    status: 'active',
-    icon: Code2,
-    latency: '45ms',
-    features: ['XPath mapping', 'Namespace stripping', 'List flattening']
-  },
-  {
-    id: 'soap',
-    name: 'SOAP / WSDL',
-    description: 'Wraps ancient SOAP services with a modern REST interface.',
-    status: 'active',
-    icon: Network,
-    latency: '180ms',
-    features: ['Envelope unwrapping', 'Fault handling', 'WSDL schema validation']
-  },
-  {
-    id: 'fixed',
-    name: 'Fixed-Width (Mainframe)',
-    description: 'Parses positional byte streams from AS400 / zOS systems.',
-    status: 'active',
-    icon: Database,
-    latency: '8ms',
-    features: ['EBCDIC decoding', 'Copybook layouts', 'Padding removal']
-  }
-]
+interface AdapterSource {
+  id: number
+  name: string
+  type: string
+  connection_type: string
+  endpoint: string
+  mapping_mode: string
+  manual_mapping?: string
+  latency: string
+}
 
 export default function Adapters() {
-  const [adapters, setAdapters] = useState(INITIAL_ADAPTERS)
+  const [adapters, setAdapters] = useState<AdapterSource[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({
     type: 'csv',
@@ -58,6 +32,37 @@ export default function Adapters() {
   const [fileContent, setFileContent] = useState<string>('')
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const getAuthToken = async () => {
+    let token = localStorage.getItem('token')
+    if (!token) {
+      const authParams = new URLSearchParams()
+      authParams.append('username', 'admin')
+      authParams.append('password', 'admin')
+      const authRes = await axios.post('http://localhost:8000/auth/token', authParams)
+      token = authRes.data.access_token
+      localStorage.setItem('token', token!)
+    }
+    return token
+  }
+
+  const fetchSources = async () => {
+    try {
+      const token = await getAuthToken()
+      const res = await axios.get('http://localhost:8000/adapters', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setAdapters(res.data)
+    } catch (e) {
+      console.error("Failed to fetch adapters", e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSources()
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -86,34 +91,37 @@ export default function Adapters() {
     }, 1500)
   }
 
-  const handleActivateSource = () => {
+  const handleActivateSource = async () => {
     if (testStatus !== 'success') return;
     
     const sourceName = formData.connectionType === 'file' && uploadedFile
       ? uploadedFile.name
       : formData.endpoint || 'custom endpoint';
 
-    const newAdapter = {
-      id: `new-${Date.now()}`,
-      name: `Custom ${formData.type.toUpperCase()} Source`,
-      description: formData.connectionType === 'file'
-        ? `Ingested local file: ${sourceName}`
-        : `Ingests data from API: ${sourceName}`,
-      status: 'active',
-      icon: formData.type === 'csv' ? FileText : formData.type === 'xml' ? Code2 : formData.type === 'soap' ? Network : Database,
-      latency: 'Calculating...',
-      features: [
-        formData.mappingMode === 'ai' ? 'AI Auto-Mapping' : 'Static Mapping Rules',
-        formData.connectionType === 'file' ? 'Local System Ingest' : 'Remote Fetch Pipeline'
-      ]
-    };
-    
-    setAdapters([...adapters, newAdapter])
-    setShowAddForm(false)
-    setFormData({ type: 'csv', connectionType: 'api', endpoint: '', mappingMode: 'ai', manualMapping: '' })
-    setUploadedFile(null)
-    setFileContent('')
-    setTestStatus('idle')
+    try {
+      const token = await getAuthToken()
+      const payload = {
+        name: `Custom ${formData.type.toUpperCase()} Source`,
+        type: formData.type,
+        connection_type: formData.connectionType,
+        endpoint: sourceName,
+        mapping_mode: formData.mappingMode,
+        manual_mapping: formData.manualMapping || null
+      }
+      
+      const res = await axios.post('http://localhost:8000/adapters', payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      setAdapters(prev => [...prev, res.data])
+      setShowAddForm(false)
+      setFormData({ type: 'csv', connectionType: 'api', endpoint: '', mappingMode: 'ai', manualMapping: '' })
+      setUploadedFile(null)
+      setFileContent('')
+      setTestStatus('idle')
+    } catch (e) {
+      console.error("Failed to onboard source", e)
+    }
   }
 
   return (
@@ -255,7 +263,7 @@ export default function Adapters() {
                 <label className="text-sm font-medium text-white">Transformation Rules (JSON)</label>
                 <textarea 
                   placeholder='{"CUST_NM": "customerName", "BAL": "balance"}'
-                  className="flex min-h-[100px] w-full rounded-md border border-card-border bg-card px-3 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 font-mono"
+                  className="flex min-h-[100px] w-full rounded-md border border-card-border bg-card px-3 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-white focus:ring-0 transition-all duration-200 font-mono"
                   value={formData.manualMapping}
                   onChange={e => setFormData({...formData, manualMapping: e.target.value})}
                 />
@@ -280,41 +288,47 @@ export default function Adapters() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {adapters.map(adapter => {
-          const Icon = adapter.icon
-          return (
-            <Card key={adapter.id} className="hover:border-primary/50 transition-colors cursor-default">
-              <CardHeader className="flex flex-row items-start justify-between pb-2">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-primary" />
-                    {adapter.name}
-                  </CardTitle>
-                  <CardDescription className="pt-1">{adapter.description}</CardDescription>
-                </div>
-                <Badge variant="success" className="bg-success/10 text-success border-success/20">Active</Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm mt-4 pt-4 border-t border-card-border">
-                  <div className="text-muted-foreground">
-                    Capabilities:
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {adapter.features.map(f => (
-                        <Badge key={f} variant="outline" className="text-[10px] bg-muted/50 text-white">{f}</Badge>
-                      ))}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
+          <span className="animate-spin text-2xl mb-2">⟳</span>
+          <span>Loading onboarding data sources...</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {adapters.map(adapter => {
+            const Icon = adapter.type === 'csv' ? FileText : adapter.type === 'xml' ? Code2 : adapter.type === 'soap' ? Network : Database
+            return (
+              <Card key={adapter.id} className="hover:border-primary/50 transition-colors cursor-default">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <Icon className="h-5 w-5 text-primary" />
+                      {adapter.name}
+                    </CardTitle>
+                    <CardDescription className="pt-1">{adapter.endpoint || 'Local File Upload'}</CardDescription>
+                  </div>
+                  <Badge variant="success" className="bg-success/10 text-success border-success/20">Active</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between text-sm mt-4 pt-4 border-t border-card-border">
+                    <div className="text-muted-foreground">
+                      Configuration:
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="outline" className="text-[10px] bg-muted/50 text-white uppercase">{adapter.mapping_mode} Mapping</Badge>
+                        <Badge variant="outline" className="text-[10px] bg-muted/50 text-white uppercase">{adapter.connection_type}</Badge>
+                      </div>
+                    </div>
+                    <div className="text-right ml-4">
+                      <div className="text-xs text-muted-foreground">Avg Ingest Latency</div>
+                      <div className="text-lg font-mono text-white">{adapter.latency}</div>
                     </div>
                   </div>
-                  <div className="text-right ml-4">
-                    <div className="text-xs text-muted-foreground">Avg Parsing Latency</div>
-                    <div className="text-lg font-mono text-white">{adapter.latency}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

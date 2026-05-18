@@ -11,6 +11,7 @@ from app.middleware.adapters.soap_adapter import SOAPAdapter
 from app.middleware.adapters.fixed_width_adapter import FixedWidthAdapter
 from app.core.config import settings
 from app.core.redis_client import get_redis
+from app.core.metrics import LEGACY_FAILURES, CACHE_REQUESTS, TRANSFORMATION_REQUESTS, TRANSFORMATION_LATENCY
 from app.schemas.models import NormalizedResponse, DataSourceCreate, DataSourceOut, TransformedRecordOut
 import time
 import json
@@ -161,6 +162,11 @@ async def fetch_via_adapter(
         if cached_val:
             data = json.loads(cached_val)
             await save_transformation_record(db, adapter_type, data, 0.0, True)
+            
+            CACHE_REQUESTS.labels(adapter_type=adapter_type, endpoint=endpoint, status="hit").inc()
+            TRANSFORMATION_REQUESTS.labels(adapter_type=adapter_type, status="success").inc()
+            TRANSFORMATION_LATENCY.labels(adapter_type=adapter_type).observe(0.0)
+            
             return NormalizedResponse(
                 normalized=data.get("records", data),
                 adapter=data.get("adapter", adapter_cls.__name__),
@@ -168,8 +174,11 @@ async def fetch_via_adapter(
                 _cached=True,
                 _legacy_down_serving_stale=False
             )
+        else:
+            CACHE_REQUESTS.labels(adapter_type=adapter_type, endpoint=endpoint, status="miss").inc()
     except Exception as e:
         logger.warning(f"Redis cache lookup failed: {e}")
+        CACHE_REQUESTS.labels(adapter_type=adapter_type, endpoint=endpoint, status="miss").inc()
 
     # 2. Resilient Fetching & 3. Parsing/Normalization
     adapter = adapter_cls(base_url=settings.LEGACY_BASE_URL)
@@ -187,12 +196,20 @@ async def fetch_via_adapter(
     except Exception as exc:
         logger.error(f"Downstream fetch failed after retries: {exc}. Activating stale-cache lookup.")
         
+        # Increment custom Legacy Failure counter
+        LEGACY_FAILURES.labels(adapter_type=adapter_type, endpoint=endpoint, error_type=type(exc).__name__).inc()
+        
         # 5. Circuit Breaking / Stale Serve
         try:
             stale_val = await redis.get(stale_key)
             if stale_val:
                 data = json.loads(stale_val)
                 await save_transformation_record(db, adapter_type, data, 0.0, True)
+                
+                CACHE_REQUESTS.labels(adapter_type=adapter_type, endpoint=endpoint, status="stale").inc()
+                TRANSFORMATION_REQUESTS.labels(adapter_type=adapter_type, status="success").inc()
+                TRANSFORMATION_LATENCY.labels(adapter_type=adapter_type).observe(0.0)
+                
                 return NormalizedResponse(
                     normalized=data.get("records", data),
                     adapter=data.get("adapter", adapter_cls.__name__),
@@ -203,12 +220,17 @@ async def fetch_via_adapter(
         except Exception as cache_err:
             logger.error(f"Failed to fetch stale cache from Redis: {cache_err}")
             
+        TRANSFORMATION_REQUESTS.labels(adapter_type=adapter_type, status="failure").inc()
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail=f"Downstream legacy service is unavailable after repeated attempts, and no stale cache is present. Error: {str(exc)}"
         )
 
     latency_ms = (time.time() - start_time) * 1000
+
+    # Record successful transformation latency & request outcomes
+    TRANSFORMATION_REQUESTS.labels(adapter_type=adapter_type, status="success").inc()
+    TRANSFORMATION_LATENCY.labels(adapter_type=adapter_type).observe(latency_ms / 1000.0)
 
     # 4. Cache & Respond
     try:
