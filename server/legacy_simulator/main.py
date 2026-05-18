@@ -15,7 +15,17 @@ from fastapi.responses import PlainTextResponse
 
 FAILURE_RATE = float(os.getenv("FAILURE_RATE", "0.2"))
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Legacy Simulator", docs_url="/docs")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _maybe_fail():
