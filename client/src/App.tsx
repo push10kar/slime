@@ -21,7 +21,7 @@ export default function App() {
           <div className="p-6">
             <div className="flex items-center gap-2 mb-1">
               <Zap className="h-6 w-6 text-primary fill-primary" />
-              <h1 className="text-xl font-medium tracking-tight text-white">LegacyBridge AI</h1>
+              <h1 className="text-xl font-medium tracking-tight text-white">Slime AI</h1>
             </div>
             <p className="text-[10px] text-muted-foreground font-medium tracking-wide uppercase mt-1">Modernization Gateway</p>
           </div>
