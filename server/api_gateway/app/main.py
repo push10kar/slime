@@ -6,7 +6,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.redis_client import init_redis, close_redis
-from app.routes import health, adapters, transform, auth, metrics_router
+from app.routes import health, adapters, transform, auth, metrics_router, upload
 
 
 @asynccontextmanager
@@ -57,4 +57,5 @@ app.include_router(health.router, tags=["Health"])
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(adapters.router, prefix="/adapters", tags=["Adapters"])
 app.include_router(transform.router, prefix="/transform", tags=["Transform"])
+app.include_router(upload.router, prefix="/transform/upload-file", tags=["Intelligent File Transform"])
 app.include_router(metrics_router.router, prefix="/api/metrics", tags=["Metrics"])

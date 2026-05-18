@@ -1,0 +1,4 @@
+id_num|||usr_nam|||is_active_flag|||acct_bal_amt
+101|||Tanmay      |||Y|||10500.50
+102|||AliceSmith  |||N|||450.00
+103|||Bob         |||1|||0.00

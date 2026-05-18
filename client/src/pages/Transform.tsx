@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { ArrowRight, Play, Wand2, RefreshCw, FileWarning } from 'lucide-react'
+import { ArrowRight, Play, Wand2, RefreshCw, FileWarning, UploadCloud, Server } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import axios from 'axios'
 import { useAppStore } from '@/store/appStore'
 
 const LEGACY_URL = 'http://localhost:7000/legacy/csv/customers'
 const API_URL = 'http://localhost:8000/adapters/csv/fetch?endpoint=customers'
+const UPLOAD_URL = 'http://localhost:8000/transform/upload-file'
 
 export default function Transform() {
   const [loading, setLoading] = useState(false)
@@ -18,6 +19,7 @@ export default function Transform() {
   const [aiMappings, setAiMappings] = useState<any[]>([])
   
   const { isAiMappingEnabled, toggleAiMapping } = useAppStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleTransform = async () => {
     setLoading(true)
@@ -26,14 +28,11 @@ export default function Transform() {
     setAiMappings([])
 
     try {
-      // 1. Fetch raw legacy
       const rawRes = await axios.get(LEGACY_URL)
       setRawLegacy(typeof rawRes.data === 'string' ? rawRes.data : JSON.stringify(rawRes.data, null, 2))
 
-      // Simulate a bit of processing delay for the UI animation effect
       await new Promise(r => setTimeout(r, 800))
 
-      // 2. Auth with API Gateway
       const authParams = new URLSearchParams()
       authParams.append('username', 'admin')
       authParams.append('password', 'admin')
@@ -41,14 +40,12 @@ export default function Transform() {
       const token = authRes.data.access_token
       const config = { headers: { Authorization: `Bearer ${token}` } }
 
-      // 3. Fetch transformed from Gateway
       const cleanRes = await axios.get(API_URL, config)
       const data = cleanRes.data
       
       setCleanJson(data.records || data)
       
       if (isAiMappingEnabled) {
-        // Simulate AI Mapping for demo purposes based on Gateway's normalizer
         setAiMappings([
           { original: 'CUST_ID', normalized: 'customerId', confidence: 0.98 },
           { original: 'CUST_NM', normalized: 'customerName', confidence: 0.95 },
@@ -65,12 +62,71 @@ export default function Transform() {
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setLoading(true)
+    setRawLegacy(null)
+    setCleanJson(null)
+    setAiMappings([])
+
+    // Read raw file content to display on the left
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      setRawLegacy(e.target?.result as string)
+      
+      try {
+        const authParams = new URLSearchParams()
+        authParams.append('username', 'admin')
+        authParams.append('password', 'admin')
+        // Using "demo" bypass or real login. Let's use the demo bypass added earlier.
+        const token = "demo"
+        
+        const formData = new FormData()
+        formData.append("file", file)
+        
+        const config = { 
+          headers: { 
+            Authorization: `Bearer ${token}`
+          } 
+        }
+
+        const res = await axios.post(UPLOAD_URL, formData, config)
+        const result = res.data
+
+        setCleanJson(result.normalized_records)
+        
+        // Convert the detected fields mapping dictionary into array format
+        if (result.detected_fields_mapping) {
+           const mappingsArray = Object.entries(result.detected_fields_mapping).map(([oldKey, newKey]) => ({
+             original: oldKey,
+             normalized: newKey as string,
+             confidence: result.confidence_score || 0.99
+           }))
+           setAiMappings(mappingsArray)
+           
+           // If we got mappings, switch AI Mapping on automatically to show them
+           if (!isAiMappingEnabled) {
+             toggleAiMapping()
+           }
+        }
+      } catch (err: any) {
+        console.error(err)
+        setCleanJson({ error: err.response?.data?.detail || err.message })
+      } finally {
+        setLoading(false)
+      }
+    }
+    reader.readAsText(file)
+  }
+
   return (
     <div className="p-8 space-y-6 h-full flex flex-col animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Transformation Pipeline</h1>
-          <p className="text-muted-foreground mt-2">Watch legacy formats get normalized and semantically mapped in real-time.</p>
+          <p className="text-muted-foreground mt-2">Upload raw files for intelligent Gemini transformation or run the generic pipeline.</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 mr-4">
@@ -82,6 +138,17 @@ export default function Transform() {
               <div className={`w-4 h-4 rounded-full transition-transform ${isAiMappingEnabled ? 'bg-primary-foreground translate-x-5' : 'bg-muted-foreground translate-x-0'}`} />
             </button>
           </div>
+          <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="gap-2">
+            <UploadCloud className="h-4 w-4" />
+            Upload File
+          </Button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            className="hidden" 
+            accept=".csv,.txt,.xml,.dat"
+          />
           <Button onClick={handleTransform} disabled={loading} size="lg" className="gap-2">
             {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             Run Pipeline
@@ -92,14 +159,14 @@ export default function Transform() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
         
         {/* LEFT: Legacy Chaos */}
-        <Card className="lg:col-span-5 flex flex-col border-error/20 bg-error/5">
+        <Card className="lg:col-span-5 flex flex-col border-error/20 bg-error/5 relative">
           <CardHeader className="border-b border-card-border/50 pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-error">
                 <FileWarning className="h-5 w-5" />
                 Legacy Source (Chaos)
               </CardTitle>
-              <Badge variant="destructive">CSV</Badge>
+              <Badge variant="destructive">RAW</Badge>
             </div>
           </CardHeader>
           <CardContent className="flex-1 p-0 overflow-hidden relative">
@@ -107,13 +174,14 @@ export default function Transform() {
               {loading ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-                  Fetching Mainframe Data...
+                  Processing Upload...
                 </div>
               ) : rawLegacy ? (
                 rawLegacy
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-600 italic">
-                  Awaiting execution...
+                <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4">
+                  <UploadCloud className="h-12 w-12 text-slate-600 mb-2" />
+                  <p className="italic">Drag and drop a file or click "Upload File"</p>
                 </div>
               )}
             </div>
@@ -133,7 +201,7 @@ export default function Transform() {
                 <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center mb-2 animate-pulse">
                   <Wand2 className="h-8 w-8 text-primary" />
                 </div>
-                <Badge className="bg-primary text-primary-foreground border-none">Normalizing</Badge>
+                <Badge className="bg-primary text-primary-foreground border-none">Gemini Thinking</Badge>
               </motion.div>
             )}
           </AnimatePresence>
@@ -151,7 +219,7 @@ export default function Transform() {
                 <Server className="h-5 w-5" />
                 API Response (Clean)
               </CardTitle>
-              <Badge variant="success">REST / JSON</Badge>
+              <Badge variant="success" className="bg-success text-white">JSON / REST</Badge>
             </div>
           </CardHeader>
           <CardContent className="flex-1 p-0 overflow-hidden relative">
@@ -167,12 +235,12 @@ export default function Transform() {
               
               <TabsContent value="json" className="flex-1 m-0 p-4 overflow-auto font-mono text-sm">
                 {loading ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">Processing...</div>
+                  <div className="flex items-center justify-center h-full text-muted-foreground">Parsing Structually...</div>
                 ) : cleanJson ? (
                   <pre className="text-success/90">{JSON.stringify(cleanJson, null, 2)}</pre>
                 ) : (
                   <div className="flex items-center justify-center h-full text-slate-600 italic">
-                    Awaiting transformed payload...
+                    Awaiting Gemini intelligent parsing...
                   </div>
                 )}
               </TabsContent>

@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # AI Mapping
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
+    GEMINI_API_KEY: str = ""
 
     # CORS
     ALLOWED_ORIGINS: List[str] = [
