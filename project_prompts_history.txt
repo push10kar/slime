@@ -1,0 +1,132 @@
+================================================================================
+📜 SLIME AI PROJECT — COMPILATION OF USER PROMPTS
+================================================================================
+
+This document contains a chronological list of all the prompts, requirements, and instructions provided by the user from the start to the end of the Slime AI Modernization Gateway project.
+
+---
+
+[PROMPT 1] - Initial Pipeline Hook
+--------------------------------------------------------------------------------
+Continue with generation process.
+
+---
+
+[PROMPT 2] - File Upload Capabilities
+--------------------------------------------------------------------------------
+In the "Legacy adapter" route, there should be feature for the user to upload the file from the local system, so the user can upload the legacy formats for future processes.
+
+---
+
+[PROMPT 3] - Legacy Adapters Button Refinement
+--------------------------------------------------------------------------------
+You are a frontend developer, your goal is to change the UI button inside the "Legacy adapters" routes to match the current UI. Always start with a short plan, then execute, then test mentally for edge cases. Dont over-engineer it.
+
+---
+
+[PROMPT 4] - Form UX/UI Modernization
+--------------------------------------------------------------------------------
+You are a frontend developer, Your goal is to improve the current UI for user input form inside the "Legacy adapters" routes to match the current UI. Always start with a short plan, then execute, then test mentally for edge cases. Dont over-engineer it.
+
+---
+
+[PROMPT 5] - Database Ingestion & Relational Schema
+--------------------------------------------------------------------------------
+You are a database engineer, go through the entire project structure and files. Your goal is to create database schemas and the incoming data sources should be stored in the database which will be shown to the UI through the API endpoints. Always start with a short plan, then execute, then test mentally for edge cases. Use postgresSQL as the database for this stack.
+
+---
+
+[PROMPT 6] - Full Observability Suite (Grafana + Prometheus)
+--------------------------------------------------------------------------------
+Add full observability to my FastAPI backend using Prometheus and Grafana.
+Instrument the API with metrics for:
+- request count
+- request latency
+- legacy system failures
+- cache hits
+- transformation success/failure
+Expose a /metrics endpoint in Prometheus format.
+Provide a working docker-compose setup that runs:
+- FastAPI service
+- Prometheus (scraping metrics every 5s)
+- Grafana (preconfigured with Prometheus datasource)
+Create basic Grafana dashboards showing:
+- API request rate
+- latency trends
+- failure rate
+- cache hit ratio
+Everything must be fully working end-to-end and demo-ready with a single docker-compose up command.
+
+---
+
+[PROMPT 7] - Run Instructions
+--------------------------------------------------------------------------------
+Act as a developer giev commands to run this entire project.
+
+---
+
+[PROMPT 8] - Core Re-Branding
+--------------------------------------------------------------------------------
+You are a frontend dev, your goal is the change the name from "Legacy AI" to "Slime AI". Do not overengineer it.
+
+---
+
+[PROMPT 9] - Routing & Empty Page Bugfixing
+--------------------------------------------------------------------------------
+You are a frontend dev, your goal is to check some routes are not working properly, its showing a blank page for adapters, transformation pipeline routes from react. Please fix it.
+
+---
+
+[PROMPT 10] - Git Ingestion Conflict Resolution
+--------------------------------------------------------------------------------
+❯ git pull
+remote: Enumerating objects: 45, done.
+remote: Counting objects: 100% (45/45), done.
+remote: Compressing objects: 100% (11/11), done.
+remote: Total 26 (delta 15), reused 26 (delta 15), pack-reused 0 (from 0)
+Unpacking objects: 100% (26/26), 7.31 KiB | 831.00 KiB/s, done.
+From github.com:push10kar/slime
+   2f815d7..bf7ee87  main       -> origin/main
+Auto-merging client/src/pages/Transform.tsx
+CONFLICT (content): Merge conflict in client/src/pages/Transform.tsx
+error: could not apply e69a901... fix(client-router): resolve trailing slash CORS redirects and lucide-react undefined FileWarning crash
+
+---
+
+[PROMPT 11] - Demo Runbook Generation
+--------------------------------------------------------------------------------
+Now how to run this entire project for the demo>
+
+---
+
+[PROMPT 12] - Compilation Fix & UI Polish
+--------------------------------------------------------------------------------
+4:13:36 PM [vite] Internal server error: Transform failed with 1 error:
+/home/pushkar/Documents/Projects/MasterProjects/slime/client/src/store/appStore.ts:164:30: ERROR: Expected ";" but found ":"
+  Plugin: vite:esbuild
+  File: /home/pushkar/Documents/Projects/MasterProjects/slime/client/src/store/appStore.ts:164:30
+  
+  Expected ";" but found ":"
+  162|                metrics: {
+  163|                  totalRequests: parsed.totalReqs,
+  164|                  failedRequests: parsed.failedReqs,
+     |                                ^
+  165|                  cacheHits,
+  166|                  avgLatency: parsed.avgLatency || (newHistory.length > 0 ? Math.round(newHistory[newHistory.length - 1].latency) : 0),
+  Fix this erroor and improve the UI.
+
+---
+
+[PROMPT 13] - Demo Dataset Request
+--------------------------------------------------------------------------------
+generate a test data i can feed to the slime AI web app for the demo.
+
+---
+
+[PROMPT 14] - Prompts History Request
+--------------------------------------------------------------------------------
+generate a txt file of all the prompts i gave to you from start to end of this project.
+
+================================================================================
+Generated on 2026-05-18T16:21:49+05:30. Good luck with the live demo! 🚀
+================================================================================
