@@ -33,10 +33,10 @@ export default function App() {
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) => 
-                  `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  `flex items-center gap-3 px-3 py-2 rounded-r-md rounded-l-none text-sm font-medium transition-all duration-200 border-l-2 ${
                     isActive 
-                      ? 'bg-muted text-white' 
-                      : 'text-muted-foreground hover:text-white hover:bg-muted/50'
+                      ? 'bg-primary/8 text-primary border-primary font-semibold shadow-sm' 
+                      : 'text-muted-foreground border-transparent hover:text-white hover:bg-muted/30'
                   }`
                 }
               >

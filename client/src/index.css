@@ -1,46 +1,109 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #09090b;
-  --color-sidebar: #09090b;
-  --color-card: #09090b;
-  --color-card-border: #27272a;
-  --color-primary: #fafafa;
-  --color-primary-foreground: #09090b;
+  --color-background: #07070a;
+  --color-sidebar: #0a0a0f;
+  --color-card: rgba(13, 13, 20, 0.7);
+  --color-card-border: rgba(255, 255, 255, 0.08);
+  --color-primary: #8b5cf6; /* Vibrant violet/purple */
+  --color-primary-foreground: #ffffff;
   --color-success: #10b981;
   --color-error: #ef4444;
   --color-warning: #f59e0b;
-  --color-muted: #18181b;
-  --color-muted-foreground: #a1a1aa;
+  --color-muted: #13131a;
+  --color-muted-foreground: #94a3b8;
 }
 
 @layer base {
   body {
     background-color: var(--color-background);
-    color: #fafafa;
+    color: #f8fafc;
     @apply antialiased selection:bg-primary/20;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
 
+/* Custom Scrollbar for sleek dark look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Glassmorphism panel styles */
 .glass-panel {
-  background-color: var(--color-sidebar);
-  border-right: 1px solid var(--color-card-border);
+  background: rgba(10, 10, 15, 0.75);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.glass-card {
+  background: rgba(13, 13, 20, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 20px 0 rgba(139, 92, 246, 0.15), 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Grid overlay background */
 .data-grid-bg {
-  /* Extremely subtle, almost invisible grid for texture */
-  background-size: 32px 32px;
+  background-size: 40px 40px;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  position: relative;
 }
 
+.data-grid-bg::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 500px;
+  background: radial-gradient(circle 800px at 50% -200px, rgba(139, 92, 246, 0.08), transparent 80%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Pipeline animated path flow */
 .animate-flow {
-  animation: flow 2s linear infinite;
+  animation: flow 1.5s linear infinite;
 }
 
 @keyframes flow {
   from { stroke-dashoffset: 24; }
   to { stroke-dashoffset: 0; }
+}
+
+/* Glow effects */
+.glow-primary {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+}
+
+.glow-success {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+/* Premium typography & gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #ffffff 30%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }

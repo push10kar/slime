@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import API_ENDPOINTS, { ensureAuthToken } from '@/lib/api'
 
 export interface Metrics {
   totalRequests: number
@@ -74,28 +75,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     pollingInterval = window.setInterval(async () => {
       try {
-        let token = localStorage.getItem('token');
-        if (!token) {
-          // Fallback auth fetch to get real PostgreSQL logs
-          const authParams = new URLSearchParams();
-          authParams.append('username', 'admin');
-          authParams.append('password', 'admin');
-          const authRes = await fetch('http://localhost:8000/auth/token', {
-            method: 'POST',
-            body: authParams
-          }).then(res => res.json()).catch(() => null);
-          if (authRes && authRes.access_token) {
-            token = authRes.access_token;
-            localStorage.setItem('token', token!);
-          }
-        }
+        const token = await ensureAuthToken();
 
-        const [metricsRes, healthRes, historyRes] = await Promise.all([
-          fetch('http://localhost:8000/metrics').catch(() => null),
-          fetch('http://localhost:7000/health').catch(() => null),
-          token ? fetch('http://localhost:8000/adapters/history', {
+        const [metricsRes, historyRes] = await Promise.all([
+          fetch(API_ENDPOINTS.METRICS_RAW).catch(() => null),
+          fetch(API_ENDPOINTS.ADAPTERS_HISTORY, {
             headers: { Authorization: `Bearer ${token}` }
-          }).catch(() => null) : Promise.resolve(null)
+          }).catch(() => null)
         ]);
 
         let newHistory: LatencyDataPoint[] = [];
@@ -137,34 +123,35 @@ export const useAppStore = create<AppState>((set, get) => ({
               : [...state.latencyHistory, { time: timeStr, latency: parsed.avgLatency || 0 }].slice(-20);
 
             let status = state.legacySystemStatus;
-            if (healthRes && healthRes.ok) {
-                if (parsed.failedReqs > 5 && parsed.failedReqs / Math.max(parsed.totalReqs, 1) > 0.2) {
-                    status = 'degraded';
-                } else {
-                    status = 'online';
-                }
-            } else {
-                status = 'offline';
-            }
+            // Check legacy health by attempting a health check
+            fetch('http://localhost:7000/health').then(res => {
+              if (parsed.failedReqs > 5 && parsed.failedReqs / Math.max(parsed.totalReqs, 1) > 0.2) {
+                status = 'degraded';
+              } else {
+                status = 'online';
+              }
+            }).catch(() => {
+              status = 'offline';
+            });
 
             return {
               metrics: {
                 totalRequests: parsed.totalReqs,
                 failedRequests: parsed.failedReqs,
-                cacheHits,
-                avgLatency: parsed.avgLatency || (newHistory.length > 0 ? Math.round(newHistory[newHistory.length - 1].latency) : 0),
+                cacheHits: cacheHits,
+                avgLatency: parsed.avgLatency
               },
               latencyHistory: history,
-              legacySystemStatus: status as any
+              legacySystemStatus: status
             };
           });
         }
-      } catch (err) {
-        console.error("Polling error", err);
+      } catch (e) {
+        console.error("Polling error:", e);
       }
-    }, 2000);
+    }, 5000);
   },
-  
+
   stopPolling: () => {
     if (pollingInterval) {
       clearInterval(pollingInterval);
