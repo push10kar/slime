@@ -3,17 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Activity, Server, Database, ArrowRight, Zap, DatabaseBackup } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-const MOCK_LATENCY = [
-  { time: '10:00', latency: 120 },
-  { time: '10:05', latency: 145 },
-  { time: '10:10', latency: 850 }, // simulate legacy spike
-  { time: '10:15', latency: 45 },  // cache hit
-  { time: '10:20', latency: 50 },  // cache hit
-  { time: '10:25', latency: 130 },
-]
+import { useEffect } from 'react'
 
 export default function Dashboard() {
-  const { metrics, legacySystemStatus } = useAppStore()
+  const { metrics, legacySystemStatus, latencyHistory, startPolling, stopPolling } = useAppStore()
+
+  useEffect(() => {
+    startPolling()
+    return () => stopPolling()
+  }, [startPolling, stopPolling])
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
@@ -78,7 +76,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={MOCK_LATENCY}>
+                <LineChart data={latencyHistory}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
