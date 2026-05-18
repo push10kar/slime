@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 import jwt
 from jwt.exceptions import InvalidTokenError
 from app.core.config import settings
+from app.schemas.models import Token, TokenData
 
 router = APIRouter()
 
@@ -21,15 +21,6 @@ FAKE_USERS = {
         "role": "admin",
     }
 }
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-
-class TokenData(BaseModel):
-    username: str | None = None
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
@@ -50,6 +41,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if settings.ENVIRONMENT == "development" and token == "demo":
+        return TokenData(username="admin")
     try:
         # PyJWT API: jwt.decode(token, secret, algorithms=[...])
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])

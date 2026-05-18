@@ -1,0 +1,29 @@
+meta:
+  schema_version: "1.0.0"
+  record_total_bytes: 34
+fields:
+  id:
+    start: 0
+    length: 4
+    type: "int"
+    padding: "left"
+    pad_char: "0"
+  name:
+    start: 4
+    length: 20
+    type: "string"
+    padding: "right"
+    pad_char: " "
+  status:
+    start: 24
+    length: 2
+    type: "string"
+    padding: "right"
+    pad_char: " "
+  balance:
+    start: 26
+    length: 8
+    type: "decimal"
+    scale: 2
+    padding: "left"
+    pad_char: "0"
