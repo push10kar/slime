@@ -1,0 +1,135 @@
+DLTE — Dynamic Legacy Transformation Engine
+Project Structure
+============================================================
+
+dlte/
+├── main.py                          # Entrypoint
+├── docker-compose.yml               # Infra
+├── Dockerfile
+├── requirements.txt
+├── pytest.ini                       # Testing config
+├── .env.example
+├── README.md
+│
+├── app/                             # FastAPI Core
+│   ├── routers/
+│   │   ├── ingest.py                # Read integration mode
+│   │   ├── writeback.py             # Write-back mode
+│   │   └── health.py
+│   ├── middleware/
+│   │   ├── auth.py                  # JWT / RBAC
+│   │   ├── rate_limiter.py
+│   │   └── pii_masker.py            # Security / PII masking
+│   ├── models/
+│   │   ├── audit.py
+│   │   ├── user.py
+│   │   └── record.py
+│   └── schemas/                     # Pydantic schemas
+│       ├── request.py
+│       ├── response.py
+│       └── validation.py
+│
+├── core/                            # Transformation Engine
+│   ├── registry/                    # Week 1 — Config Registry
+│   │   ├── copybook_loader.py
+│   │   ├── schema_registry.py
+│   │   ├── yaml_parser.py
+│   │   └── copybooks/               # Externalized YAML layouts
+│   │       ├── customer.yaml
+│   │       └── transaction.yaml
+│   │
+│   ├── adapters/                    # Plugin-Based Adapter Architecture
+│   │   ├── base.py
+│   │   ├── csv_adapter.py
+│   │   ├── xml_adapter.py
+│   │   ├── soap_adapter.py
+│   │   ├── fixed_width_adapter.py   # Week 2
+│   │   └── mainframe_adapter.py     # EBCDIC streams
+│   │
+│   ├── ingestion/                   # Week 2 — Byte-to-JSON Pipeline
+│   │   ├── byte_parser.py
+│   │   ├── type_coercion.py
+│   │   └── normalizer.py
+│   │
+│   ├── serialization/               # Week 3 — JSON-to-Byte Pipeline
+│   │   ├── marshaller.py
+│   │   ├── truncator.py             # Defensive truncation
+│   │   └── validator.py
+│   │
+│   ├── streaming/                   # Week 4 — Memory-Insulated Streaming
+│   │   ├── chunk_generator.py       # O(1) memory profile
+│   │   ├── offset_indexer.py        # <15ms lookup via Redis
+│   │   └── dlq_router.py            # Dead Letter Queue / fault isolation
+│   │
+│   └── ai/                          # AI Integration Layer
+│       ├── schema_mapper.py         # Semantic schema mapping (OpenAI)
+│       ├── field_normalizer.py      # Intelligent field normalization
+│       └── doc_generator.py         # Auto documentation generation
+│
+├── services/                        # Infrastructure Services
+│   ├── cache.py                     # Redis — offset index, session, retry
+│   ├── db.py                        # PostgreSQL — audit logs, metadata
+│   ├── messaging.py                 # RabbitMQ / Kafka — async & retry queues
+│   └── observability.py             # Prometheus + Grafana metrics
+│
+├── config/
+│   ├── settings.py
+│   └── logging.py
+│
+├── frontend/                        # React + Tailwind Dashboard
+│   └── src/
+│       ├── components/
+│       │   ├── SchemaViewer.jsx
+│       │   ├── TransformLog.jsx
+│       │   ├── HealthMonitor.jsx
+│       │   └── LatencyChart.jsx
+│       ├── pages/
+│       │   ├── Dashboard.jsx
+│       │   └── Explorer.jsx
+│       └── tailwind.config.js
+│
+├── tests/                           # Pytest Suite
+│   ├── unit/
+│   │   ├── test_adapters.py
+│   │   ├── test_streaming.py
+│   │   └── test_serialization.py
+│   └── integration/                 # Week 5 — Load & Integration Testing
+│       ├── test_api.py
+│       ├── test_load.py
+│       └── test_failure_recovery.py
+│
+└── docs/
+    ├── openapi.yaml                  # Swagger / OpenAPI spec
+    ├── architecture.md
+    └── copybook_guide.md
+
+============================================================
+Tech Stack Summary
+============================================================
+
+Layer                   Technology
+------------------------------------------------------------
+API Gateway             Python 3.11+, FastAPI (async)
+Validation              Pydantic, PyYAML
+Legacy Processing       FixedWidth, CSV, XML, SOAP, EBCDIC
+Database                PostgreSQL (primary), SQLite (alt)
+Caching / Indexing      Redis
+AI Integration          OpenAI API, Ollama (fallback)
+Messaging               RabbitMQ, Apache Kafka
+Frontend                React, Tailwind CSS
+API Docs                Swagger / OpenAPI
+Observability           Prometheus, Grafana
+Security                JWT, API Keys, RBAC, Rate Limiting
+Containerization        Docker, Docker Compose
+Testing                 Pytest
+Version Control         GitHub
+
+============================================================
+5-Week Roadmap
+============================================================
+
+Week 1   Configuration Registry & External YAML Copybook Parsing
+Week 2   Ingestion Engine, Byte-to-JSON Translation, Type Coercion
+Week 3   Serialization Engine & FastAPI Foundation
+Week 4   Streaming Chunk Generators, Offset Index Caching, DLQ
+Week 5   Integration Testing, Load Profiling, API Deployment
