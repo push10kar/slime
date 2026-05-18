@@ -31,3 +31,36 @@ class NormalizedResponse(BaseModel):
         "populate_by_name": True,
         "serialize_by_alias": True
     }
+
+class DataSourceCreate(BaseModel):
+    name: str
+    type: str
+    connection_type: str
+    endpoint: Optional[str] = None
+    mapping_mode: str = "ai"
+    manual_mapping: Optional[str] = None
+
+class DataSourceOut(BaseModel):
+    id: int
+    name: str
+    type: str
+    connection_type: str
+    endpoint: Optional[str] = None
+    mapping_mode: str
+    manual_mapping: Optional[str] = None
+    latency: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TransformedRecordOut(BaseModel):
+    id: int
+    adapter_type: str
+    payload_preview: str
+    latency_ms: float
+    cached: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

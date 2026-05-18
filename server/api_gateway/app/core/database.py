@@ -21,6 +21,8 @@ class Base(DeclarativeBase):
 
 
 async def init_db():
+    # Import models here to register them with Base.metadata before creating tables
+    from app import models
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

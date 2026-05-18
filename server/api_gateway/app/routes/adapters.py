@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
+from typing import List
+from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.routes.auth import get_current_user
+from app.core.database import get_db
+from app import models
 from app.middleware.adapters.csv_adapter import CSVAdapter
 from app.middleware.adapters.xml_adapter import XMLAdapter
 from app.middleware.adapters.soap_adapter import SOAPAdapter
 from app.middleware.adapters.fixed_width_adapter import FixedWidthAdapter
 from app.core.config import settings
 from app.core.redis_client import get_redis
-from app.schemas.models import NormalizedResponse
+from app.schemas.models import NormalizedResponse, DataSourceCreate, DataSourceOut, TransformedRecordOut
 import time
 import json
 import logging
@@ -24,17 +29,125 @@ ADAPTER_MAP = {
     "fixed_width": FixedWidthAdapter,
 }
 
-@router.get("/", summary="List available adapters")
-async def list_adapters(_: str = Depends(get_current_user)):
-    return {"adapters": list(ADAPTER_MAP.keys())}
+
+async def save_transformation_record(
+    db: AsyncSession,
+    adapter_type: str,
+    payload: dict,
+    latency_ms: float,
+    cached: bool
+):
+    try:
+        preview = json.dumps(payload)[:1000]
+        record = models.TransformedRecord(
+            adapter_type=adapter_type,
+            payload_preview=preview,
+            latency_ms=latency_ms,
+            cached=cached
+        )
+        db.add(record)
+        await db.commit()
+    except Exception as e:
+        logger.error(f"Failed to save transform history to DB: {e}")
+
+
+@router.post("/", response_model=DataSourceOut, status_code=status.HTTP_201_CREATED, summary="Onboard new legacy source")
+async def create_data_source(
+    source: DataSourceCreate,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    new_source = models.DataSource(
+        name=source.name,
+        type=source.type,
+        connection_type=source.connection_type,
+        endpoint=source.endpoint,
+        mapping_mode=source.mapping_mode,
+        manual_mapping=source.manual_mapping,
+        latency="Calculating..."
+    )
+    db.add(new_source)
+    await db.commit()
+    await db.refresh(new_source)
+    return new_source
+
+
+@router.get("/", response_model=List[DataSourceOut], summary="List all legacy sources")
+async def list_adapters(
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    result = await db.execute(select(models.DataSource))
+    sources = result.scalars().all()
+    
+    # Return defaults if database has none onboarded yet
+    if not sources:
+        default_sources = [
+            models.DataSource(
+                id=1,
+                name="Flat File (CSV)",
+                type="csv",
+                connection_type="api",
+                endpoint="http://localhost:7000/legacy/csv",
+                mapping_mode="ai",
+                latency="12ms"
+            ),
+            models.DataSource(
+                id=2,
+                name="Hierarchical (XML)",
+                type="xml",
+                connection_type="api",
+                endpoint="http://localhost:7000/legacy/xml",
+                mapping_mode="ai",
+                latency="45ms"
+            ),
+            models.DataSource(
+                id=3,
+                name="SOAP / WSDL",
+                type="soap",
+                connection_type="api",
+                endpoint="http://localhost:7000/legacy/soap",
+                mapping_mode="manual",
+                latency="180ms"
+            ),
+            models.DataSource(
+                id=4,
+                name="Fixed-Width (Mainframe)",
+                type="fixed_width",
+                connection_type="api",
+                endpoint="http://localhost:7000/legacy/fixed",
+                mapping_mode="ai",
+                latency="8ms"
+            )
+        ]
+        return default_sources
+        
+    return sources
+
+
+@router.get("/history", response_model=List[TransformedRecordOut], summary="Retrieve normalized data history logs")
+async def get_transform_history(
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(models.TransformedRecord)
+        .order_by(models.TransformedRecord.created_at.desc())
+        .limit(20)
+    )
+    return result.scalars().all()
+
 
 @router.get("/{adapter_type}/fetch", response_model=NormalizedResponse, summary="Fetch & normalize data via adapter")
 async def fetch_via_adapter(
     adapter_type: str,
     endpoint: str = Query(default="customers", description="Legacy endpoint to call"),
+    db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    adapter_cls = ADAPTER_MAP.get(adapter_type)
+    # Map fixed_width mapping to fixed adapter if requested
+    mapped_type = "fixed_width" if adapter_type == "fixed" else adapter_type
+    adapter_cls = ADAPTER_MAP.get(mapped_type)
     if not adapter_cls:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Adapter '{adapter_type}' not found.")
 
@@ -47,6 +160,7 @@ async def fetch_via_adapter(
         cached_val = await redis.get(cache_key)
         if cached_val:
             data = json.loads(cached_val)
+            await save_transformation_record(db, adapter_type, data, 0.0, True)
             return NormalizedResponse(
                 normalized=data.get("records", data),
                 adapter=data.get("adapter", adapter_cls.__name__),
@@ -62,8 +176,6 @@ async def fetch_via_adapter(
     start_time = time.time()
     
     try:
-        # Explicit Tenacity orchestration inside the route to prove absolute resilience
-        # Retries up to 3 times, exponential wait (1s min, 8s max), for HTTP errors or request exceptions
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(3),
             wait=wait_exponential(multiplier=1, min=1, max=8),
@@ -80,6 +192,7 @@ async def fetch_via_adapter(
             stale_val = await redis.get(stale_key)
             if stale_val:
                 data = json.loads(stale_val)
+                await save_transformation_record(db, adapter_type, data, 0.0, True)
                 return NormalizedResponse(
                     normalized=data.get("records", data),
                     adapter=data.get("adapter", adapter_cls.__name__),
@@ -99,12 +212,13 @@ async def fetch_via_adapter(
 
     # 4. Cache & Respond
     try:
-        # Cache standard payload with designated TTL
         await redis.setex(cache_key, settings.CACHE_TTL_SECONDS, json.dumps(result))
-        # Keep a persistent backup for stale serving
         await redis.set(stale_key, json.dumps(result))
     except Exception as cache_err:
         logger.warning(f"Failed to write to Redis cache: {cache_err}")
+
+    # Persist the clean legacy output to PostgreSQL database for future analytics
+    await save_transformation_record(db, adapter_type, result, latency_ms, False)
 
     return NormalizedResponse(
         normalized=result.get("records", result),
